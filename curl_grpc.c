@@ -101,6 +101,7 @@ size_t handle_callback(char *ptr, size_t size, size_t nmemb, void *userdata) {
     exit(1);
   }
   printf("response msg: %s\n", response->msg);
+  helloworld__hello_reply__free_unpacked(response, NULL);
 
   return realsize;
 }
