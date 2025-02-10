@@ -49,15 +49,14 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  struct curl_slist *headers = NULL;
-  headers = curl_slist_append(headers, "Content-Type: application/grpc+proto");
-
   curl_easy_setopt(curl, CURLOPT_URL,
                    "http://localhost:50051/helloworld.Greeter/SayHello");
   curl_easy_setopt(curl, CURLOPT_HTTP_VERSION,
                    CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE);
   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, buf);
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, len + 5);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, len + PREFIX_LENGTH);
+  struct curl_slist *headers = NULL;
+  headers = curl_slist_append(headers, "Content-Type: application/grpc+proto");
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, handle_callback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, NULL);
@@ -94,8 +93,8 @@ long bin_to_dec(int *bin, size_t len) {
 size_t handle_callback(char *ptr, size_t size, size_t nmemb, void *userdata) {
   size_t realsize = size * nmemb;
 
-  Helloworld__HelloReply *response =
-      helloworld__hello_reply__unpack(NULL, realsize - PREFIX_LENGTH, ptr+PREFIX_LENGTH);
+  Helloworld__HelloReply *response = helloworld__hello_reply__unpack(
+      NULL, realsize - PREFIX_LENGTH, ptr + PREFIX_LENGTH);
   if (response == NULL) {
     fprintf(stderr, "error unpacking incoming message\n");
     exit(1);

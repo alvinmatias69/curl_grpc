@@ -5,8 +5,6 @@ project('curl_grpc', 'c',
 cc = meson.get_compiler('c')
 m_dep = cc.find_library('m', required : true)
 
-incdir = include_directories('proto')
-
 deps = [
     dependency('libprotobuf-c', version: '>= 1.0.0'),
     dependency('libcurl', version: '>=7.50.0'),
@@ -14,6 +12,8 @@ deps = [
     ]
 
 sources = ['curl_grpc.c', './proto/helloworld.pb-c.c']
+
+incdir = include_directories('proto')
 
 exe = executable('curl_grpc', sources,
   install : true, include_directories : incdir, dependencies : deps)
