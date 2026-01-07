@@ -2,12 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <stdint.h>
 
 // curl stuff
 #include <curl/curl.h>
-
-// protobuf stuff
-#include "proto/helloworld.pb-c.h"
 
 #define PROJECT_NAME "curl_grpc"
 
@@ -19,16 +18,25 @@ size_t handle_callback(char *ptr, size_t size, size_t nmemb, void *userdata);
 
 int main(int argc, char **argv) {
   if (argc < 2) {
-    printf("message is required\n");
+    printf("proto is required\n");
     return 1;
   }
 
-  Helloworld__HelloRequest request = HELLOWORLD__HELLO_REQUEST__INIT;
-  uint8_t *buf;
-  size_t len;
+  if (argc < 3) {
+    printf("payload is required\n");
+    return 1;
+  }
 
-  request.name = argv[1];
-  len = helloworld__hello_request__get_packed_size(&request);
+  char command[255];
+  sprintf(command, "protoc --encode=helloworld.HelloRequest %s > encoded_payload", argv[1]);
+  FILE *encode_pipe = popen(command, "w");
+  fputs(argv[2], encode_pipe);
+  pclose(encode_pipe);
+
+  struct stat st;
+  stat("encoded_payload", &st);
+  size_t len = st.st_size;
+  uint8_t *buf;
   buf = malloc(PREFIX_LENGTH + len);
 
   buf[0] = 0;
@@ -39,7 +47,9 @@ int main(int argc, char **argv) {
   }
   free(bin);
 
-  helloworld__hello_request__pack(&request, buf + PREFIX_LENGTH);
+  FILE *encoded_payload = fopen("encoded_payload", "rb");
+  fread(buf+PREFIX_LENGTH, len,1, encoded_payload);
+  fclose(encoded_payload);
 
   curl_global_init(CURL_GLOBAL_ALL);
   CURL *curl = curl_easy_init();
@@ -59,7 +69,7 @@ int main(int argc, char **argv) {
   headers = curl_slist_append(headers, "Content-Type: application/grpc+proto");
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, handle_callback);
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, NULL);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, argv[1]);
 
   CURLcode res = curl_easy_perform(curl);
   if (res != CURLE_OK)
@@ -91,16 +101,11 @@ long bin_to_dec(int *bin, size_t len) {
 }
 
 size_t handle_callback(char *ptr, size_t size, size_t nmemb, void *userdata) {
-  size_t realsize = size * nmemb;
+  char command[255];
+  sprintf(command, "protoc --decode=helloworld.HelloReply %s > response_decoded", (char *) userdata);
+  FILE *decode_pipe = popen(command, "w");
+  fputs(ptr+PREFIX_LENGTH, decode_pipe);
+  pclose(decode_pipe);
 
-  Helloworld__HelloReply *response = helloworld__hello_reply__unpack(
-      NULL, realsize - PREFIX_LENGTH, ptr + PREFIX_LENGTH);
-  if (response == NULL) {
-    fprintf(stderr, "error unpacking incoming message\n");
-    exit(1);
-  }
-  printf("response msg: %s\n", response->msg);
-  helloworld__hello_reply__free_unpacked(response, NULL);
-
-  return realsize;
+  return size * nmemb;
 }
